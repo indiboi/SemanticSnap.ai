@@ -32,69 +32,65 @@ ALLOWED_MIME_TYPES = {
 MAX_FILE_SIZE = 100 * 1024 * 1024 
 
 @router.post("/upload")
-async def upload_multiple_media(
+async def upload_media(
     background_tasks: BackgroundTasks,
-    files: list[UploadFile] = File(...),
+    file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    uploaded_files = []
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="No file provided"
+        )
 
-    for file in files:
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {file.content_type}"
+        )
 
-        if not file.filename:
-            continue
-
-        if file.content_type not in ALLOWED_MIME_TYPES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: {file.content_type}"
-            )
-
-        try:
-            stored_name, file_path, file_size = await save_file(
-                user_id=current_user.id,
-                file=file
-            )
-
-        except ValueError:
-            raise HTTPException(
-                status_code=413,
-                detail=f"{file.filename} exceeds the 100 MB limit"
-            )
-
-        media = Media(
+    try:
+        stored_name, file_path, file_size = await save_file(
             user_id=current_user.id,
-            original_name=file.filename,
-            stored_name=stored_name,
-            file_path=file_path,
-            media_type=file.content_type,
-            file_size=file_size,
-            status="pending"
+            file=file
         )
 
-        db.add(media)
-        db.flush()
-
-        background_tasks.add_task(
-            process_media,
-            media.id
+    except ValueError:
+        raise HTTPException(
+            status_code=413,
+            detail=f"{file.filename} exceeds the 100 MB limit"
         )
 
-        uploaded_files.append({
+    media = Media(
+        user_id=current_user.id,
+        original_name=file.filename,
+        stored_name=stored_name,
+        file_path=file_path,
+        media_type=file.content_type,
+        file_size=file_size,
+        status="pending"
+    )
+
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+
+    background_tasks.add_task(
+        process_media,
+        media.id
+    )
+
+    return {
+        "message": "File uploaded successfully",
+        "file": {
             "id": media.id,
             "original_name": media.original_name,
             "media_type": media.media_type,
             "file_size": media.file_size,
             "status": media.status,
             "created_at": media.created_at
-        })
-
-    db.commit()
-
-    return {
-        "message": "Files uploaded successfully",
-        "files": uploaded_files
+        }
     }
 
 
@@ -131,7 +127,7 @@ def semantic_search(
     results = search_media(
         query_embedding=query_embedding,
         user_id=current_user.id,
-        limit=20
+        limit=3
     )
 
     media_ids = [
