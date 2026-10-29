@@ -94,14 +94,18 @@ async def upload_media(
     }
 
 
+
 @router.get("/")
 def get_user_media(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    media_files = db.query(Media).filter(
-        Media.user_id == current_user.id
-    ).all()
+    media_files = (
+        db.query(Media)
+        .filter(Media.user_id == current_user.id)
+        .order_by(Media.created_at.desc())
+        .all()
+    )
 
     return {
         "files": [
@@ -110,11 +114,14 @@ def get_user_media(
                 "original_name": media.original_name,
                 "media_type": media.media_type,
                 "file_size": media.file_size,
-                "created_at": media.created_at
+                "status": media.status,
+                "created_at": media.created_at,
+                "image_url": f"/media/{media.id}/file"
             }
             for media in media_files
         ]
     }
+
 
 @router.get("/search")
 def semantic_search(
