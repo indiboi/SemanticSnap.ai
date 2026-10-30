@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI 
 from sqlalchemy import text
 
@@ -10,7 +11,16 @@ from app.services.vector_store import (
     create_user_id_index
 )
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        create_collection()
+        create_user_id_index()
+    except Exception as e:
+        print(f"Warning: Failed to initialize Qdrant on startup: {e}")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth_router)
 app.include_router(media_router)

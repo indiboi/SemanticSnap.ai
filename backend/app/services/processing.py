@@ -33,7 +33,8 @@ def process_media(media_id: int):
         media.status = "indexed"
         db.commit()
 
-    except Exception:
+    except Exception as e:
+        print(f"Error processing media {media_id}: {e}")
         media = db.query(Media).filter(
             Media.id == media_id
         ).first()

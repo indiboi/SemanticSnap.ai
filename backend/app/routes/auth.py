@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.user import User
-from app.schemas.auth import SignupRequest, LoginRequest
+from app.schemas.auth import SignupRequest, LoginRequest, UpdateProfileRequest
 from app.core.security import hash_password, verify_password, create_access_token
 from app.routes.dependencies import get_current_user
 
@@ -84,3 +84,31 @@ def get_me(current_user: User = Depends(get_current_user)):
         "name": current_user.name,
         "email": current_user.email
     }
+
+
+@router.put("/me")
+def update_profile(
+    data: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    new_name = data.name.strip()
+    if not new_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Name cannot be empty"
+        )
+
+    current_user.name = new_name
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "id": current_user.id,
+            "name": current_user.name,
+            "email": current_user.email
+        }
+    }
+

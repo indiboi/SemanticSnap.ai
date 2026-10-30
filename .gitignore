@@ -2,3 +2,6 @@
 .env
 __pycache__/
 storage/
+frontend/node_modules   
+.vscode
+pyrightconfig.json
